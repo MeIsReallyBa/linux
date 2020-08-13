@@ -36,10 +36,4 @@ config  ETH_PAGE_ALLOC_SKB
 
 endchoice
 
-config	SOC_MT7621
-	bool
-	default y
-
-config  RAETH_QDMA
-	bool default y
 endif 	# RAETH

@@ -2693,6 +2693,104 @@ static void mt7530_trgmii_clock_setting(u32 xtal_mode)
 	mdelay(100);
 }
 
+void trgmii_set_7621(void)
+{
+	u32 val = 0;
+	u32 val_0 = 0;
+
+	val = sys_reg_read(RSTCTRL);
+	/* MT7621 need to reset GMAC and FE first */
+	val = val | RALINK_FE_RST | RALINK_ETH_RST;
+	sys_reg_write(RSTCTRL, val);
+
+	/* set TRGMII clock */
+	val_0 = sys_reg_read(CLK_CFG_0);
+	val_0 &= 0xffffff9f;
+	val_0 |= (0x1 << 5);
+	sys_reg_write(CLK_CFG_0, val_0);
+	mdelay(1);
+	val_0 = sys_reg_read(CLK_CFG_0);
+	pr_info("set CLK_CFG_0 = 0x%x!!!!!!!!!!!!!!!!!!1\n", val_0);
+	val = val & ~(RALINK_FE_RST | RALINK_ETH_RST);
+	sys_reg_write(RSTCTRL, val);
+	pr_info("trgmii_set_7621 Completed!!\n");
+}
+
+void trgmii_set_7530(void)
+{
+	u32 regValue;
+
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x404);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_read(31, 0x7800, &regValue);
+	regValue = (regValue >> 9) & 0x3;
+	if (regValue == 0x3)
+		mii_mgr_write(0, 14, 0x0C00);/*25Mhz XTAL for 150Mhz CLK */
+	 else if (regValue == 0x2)
+		mii_mgr_write(0, 14, 0x0780);/*40Mhz XTAL for 150Mhz CLK */
+
+	mdelay(1);
+
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x409);
+	mii_mgr_write(0, 13, 0x401f);
+	if (regValue == 0x3) /* 25MHz */
+		mii_mgr_write(0, 14, 0x57);
+	else
+		mii_mgr_write(0, 14, 0x87);
+	mdelay(1);
+
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x40a);
+	mii_mgr_write(0, 13, 0x401f);
+	if (regValue == 0x3) /* 25MHz */
+		mii_mgr_write(0, 14, 0x57);
+	else
+		mii_mgr_write(0, 14, 0x87);
+
+/* PLL BIAS en */
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x403);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_write(0, 14, 0x1800);
+	mdelay(1);
+
+/* BIAS LPF en */
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x403);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_write(0, 14, 0x1c00);
+
+/* sys PLL en */
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x401);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_write(0, 14, 0xc020);
+
+/* LCDDDS PWDS */
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x406);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_write(0, 14, 0xa030);
+	mdelay(1);
+
+/* GSW_2X_CLK */
+	mii_mgr_write(0, 13, 0x1f);
+	mii_mgr_write(0, 14, 0x410);
+	mii_mgr_write(0, 13, 0x401f);
+	mii_mgr_write(0, 14, 0x0003);
+	mii_mgr_write_cl45(0, 0x1f, 0x410, 0x0003);
+
+/* enable P6 */
+	mii_mgr_write(31, 0x3600, 0x5e33b);
+
+/* enable TRGMII */
+	mii_mgr_write(31, 0x7830, 0x1);
+
+	pr_info("trgmii_set_7530 Completed!!\n");
+}
+
 static void is_switch_vlan_table_busy(void)
 {
 	int j = 0;
@@ -2819,6 +2917,13 @@ static void setup_internal_gsw(void)
 		reg_bit_zero(RALINK_SYSCTL_BASE + 0x2c, 11, 1);
 	reg_bit_one(ETHDMASYS_ETH_SW_BASE + 0x0390, 1, 1);	/* TRGMII mode */
 
+	#if defined(CONFIG_GE1_RGMII_FORCE_1200)
+
+	if (ei_local->chip_name == MT7621_FE)
+		trgmii_set_7621();
+
+	#endif
+
 	/*Hardware reset Switch */
 
 	reg_bit_zero((void __iomem *)gpio_base_virt + 0x520, 1, 1);
@@ -2854,6 +2959,18 @@ static void setup_internal_gsw(void)
 	}
 	mii_mgr_write(31, 0x7000, 0x3);	/* reset switch */
 	usleep_range(100, 110);
+
+	#if defined(CONFIG_GE1_RGMII_FORCE_1200)
+
+	if (ei_local->chip_name == MT7621_FE) {
+	trgmii_set_7530();
+	/* enable MDIO to control MT7530 */
+	reg_value = sys_reg_read(RALINK_SYSCTL_BASE + 0x60);
+	reg_value &= ~(0x3 << 12);
+	sys_reg_write(RALINK_SYSCTL_BASE + 0x60, reg_value);
+	}
+
+	#endif
 
 	/* (GE1, Force 1000M/FD, FC ON) */
 	sys_reg_write(RALINK_ETH_SW_BASE + 0x100, 0x2105e33b);
@@ -2911,12 +3028,18 @@ static void setup_internal_gsw(void)
 		mii_mgr_write_cl45(0, 0x1f, 0x40e, 0x119);
 		mii_mgr_write_cl45(0, 0x1f, 0x40d, 0x2820);
 		usleep_range(20, 30);	/* suggest by CD */
+	#if defined(CONFIG_GE1_RGMII_FORCE_1200)
+		mii_mgr_write_cl45(0, 0x1f, 0x410, 0x3);
+	#else
 		mii_mgr_write_cl45(0, 0x1f, 0x410, 0x1);
+	#endif
+
 	} else {
 		xtal_mode = 3;
-	 /*TODO*/}
+	 /* TODO */}
 
 	/* set MT7530 central align */
+	#if !defined(CONFIG_GE1_RGMII_FORCE_1200)  /* for RGMII 1000HZ */
 	mii_mgr_read(31, 0x7830, &reg_value);
 	reg_value &= ~1;
 	reg_value |= 1 << 1;
@@ -2928,6 +3051,7 @@ static void setup_internal_gsw(void)
 
 	reg_value = 0x855;
 	mii_mgr_write(31, 0x7a78, reg_value);
+	#endif
 
 	mii_mgr_write(31, 0x7b00, 0x104);	/* delay setting for 10/1000M */
 	mii_mgr_write(31, 0x7b04, 0x10);	/* delay setting for 10/1000M */
