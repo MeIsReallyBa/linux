@@ -52,7 +52,7 @@
 struct timer_list hwnat_clear_entry_timer;
 static void hwnat_clear_entry(unsigned long data)
 {
-	printk("HW_NAT work normally\n");
+	//printk("HW_NAT work normally\n");
 	reg_modify_bits(PPE_FOE_CFG, FWD_CPU_BUILD_ENTRY, 4, 2);
 	//del_timer_sync(&hwnat_clear_entry_timer);
 
@@ -288,7 +288,7 @@ uint16_t remove_vlan_tag(struct sk_buff *skb)
 	/* something wrong */
 	if ((veth->h_vlan_proto != htons(ETH_P_8021Q)) && (veth->h_vlan_proto != 0x5678)) {
 		//if (pr_debug_ratelimited())
-			pr_info("HNAT: Reentry packet is untagged frame?\n");
+		//	pr_info("HNAT: Reentry packet is untagged frame?\n");
 		return 65535;
 	}
 	/*we just want to get vid*/
@@ -569,7 +569,7 @@ int get_bridge_info(void)
 {
 	struct net_device *br0_dev; 
 	struct in_device *br0_in_dev;
-#if defined(CONFIG_SUPPORT_OPENWRT)
+#if 0
 	br0_dev = dev_get_by_name(&init_net,"br-lan");
 #else
 	br0_dev = dev_get_by_name(&init_net,"br0");
@@ -594,8 +594,8 @@ int get_bridge_info(void)
 	else
 		pr_info("br0_in_dev = NULL\n");
 	
-	pr_info("br0Ip = %x\n", br0Ip);
-	pr_info("brNetmask = %x\n", brNetmask);
+	pr_debug("br0Ip = %x\n", br0Ip);
+	pr_debug("brNetmask = %x\n", brNetmask);
 	getBrLan = 1;
 	
 	return 0;
@@ -2650,7 +2650,7 @@ defined(CONFIG_MT7610_AP_APCLI) || defined(CONFIG_APCLI_SUPPORT)
 			offset = RTMP_GET_PACKET_IF(skb) + DP_RA0;
 #endif				/* CONFIG_RT2860V2_AP_WDS // */
 	}
-#if defined(CONFIG_SUPPORT_OPENWRT)
+#if 0
 	else if (strncmp(skb->dev->name, "eth0", 4) == 0)
 		offset = DP_GMAC;
 #ifdef CONFIG_RAETH_GMAC2
@@ -2699,21 +2699,26 @@ defined(CONFIG_MT7610_AP_APCLI) || defined(CONFIG_APCLI_SUPPORT)
 
 	if (IS_IPV4_HNAT(entry) || IS_IPV4_HNAPT(entry)) {
 		entry->ipv4_hnapt.act_dp = offset;
-		entry->ipv4_hnapt.iblk2.acnt = offset;
+		entry->ipv4_hnapt.iblk2.port_mg = 0x3f;
+		entry->ipv4_hnapt.iblk2.port_ag = offset;
 	}
 #if defined(CONFIG_RA_HW_NAT_IPV6)
 	else if (IS_IPV4_DSLITE(entry)) {
 		entry->ipv4_dslite.act_dp = offset;
-		entry->ipv4_dslite.iblk2.acnt = offset;
+		entry->ipv4_dslite.iblk2.port_mg = 0x3f;
+		entry->ipv4_dslite.iblk2.port_ag = offset;
 	} else if (IS_IPV6_3T_ROUTE(entry)) {
 		entry->ipv6_3t_route.act_dp = offset;
-		entry->ipv6_3t_route.iblk2.acnt = offset;
+		entry->ipv6_3t_route.iblk2.port_mg = 0x3f;
+		entry->ipv6_3t_route.iblk2.port_ag = offset;
 	} else if (IS_IPV6_5T_ROUTE(entry)) {
 		entry->ipv6_5t_route.act_dp = offset;
-		entry->ipv6_5t_route.iblk2.acnt = offset;
+		entry->ipv6_5t_route.iblk2.port_mg = 0x3f;
+		entry->ipv6_5t_route.iblk2.port_ag = offset;
 	} else if (IS_IPV6_6RD(entry)) {
 		entry->ipv6_6rd.act_dp = offset;
-		entry->ipv6_6rd.iblk2.acnt = offset;
+		entry->ipv6_6rd.iblk2.port_mg = 0x3f;
+		entry->ipv6_6rd.iblk2.port_ag = offset;
 	} else {
 		return 1;
 	}
@@ -2765,7 +2770,7 @@ void ppe_dev_reg_handler(struct net_device *dev)
 	int i;
 	for (i = 0; i < MAX_IF_NUM; i++) {
 		if (dst_port[i] == dev) {
-			pr_info("%s : %s dst_port table has beed registered(%d)\n", __func__, dev->name, i);
+			pr_debug("%s : %s dst_port table has beed registered(%d)\n", __func__, dev->name, i);
 			return;
 		}
 		if (dst_port[i] == NULL) {
@@ -3624,7 +3629,7 @@ defined(CONFIG_MT7610_AP_MESH)
 #if defined(CONFIG_RA_HW_NAT_WIFI_NEW_ARCH)
 		struct net_device *dev;
 		int i;
-#if defined(CONFIG_SUPPORT_OPENWRT)
+#if 0
 		dev = ra_dev_get_by_name("eth0");
 		ppe_dev_reg_handler(dev);
 		for (i = 0; i < MAX_IF_NUM; i++) {
@@ -3669,7 +3674,7 @@ defined(CONFIG_MT7610_AP_MESH)
 #endif
 
 #else
-#if defined(CONFIG_SUPPORT_OPENWRT)
+#if 0
 		dst_port[DP_GMAC] = ra_dev_get_by_name("eth0");
 #ifdef CONFIG_RAETH_GMAC2
 		dst_port[DP_GMAC2] = ra_dev_get_by_name("eth1");
@@ -3950,7 +3955,7 @@ static void set_acl_fwd(uint32_t ebl)
 	unsigned int i, value;
 
 	if (ebl) {
-#if defined(CONFIG_SUPPORT_OPENWRT)
+#if 0
 #if defined(CONFIG_RAETH_SPECIAL_TAG)
 #if defined(CONFIG_WAN_AT_P4)
 		wan_int = ra_dev_get_by_name("eth0.5");
@@ -4277,14 +4282,14 @@ void foe_clear_entry(struct neighbour *neigh)
 				    (entry->ipv4_hnapt.dmac_hi[0] != mac3) ||
 				    (entry->ipv4_hnapt.dmac_lo[1] != mac4) ||
 				    (entry->ipv4_hnapt.dmac_lo[0] != mac5)) {
-				    	printk("%s: state=%d\n",__func__,neigh->nud_state);
+				    	//printk("%s: state=%d\n",__func__,neigh->nud_state);
 				    	reg_modify_bits(PPE_FOE_CFG, ONLY_FWD_CPU, 4, 2);
 				    	
 				  	entry->ipv4_hnapt.udib1.state = INVALID;
 					entry->ipv4_hnapt.udib1.time_stamp = reg_read(FOE_TS) & 0xFF;
 					ppe_set_cache_ebl();
 					mod_timer(&hwnat_clear_entry_timer, jiffies + 3 * HZ);
-				
+				/*
 					printk("delete old entry: dip =%x\n", ntohl(dip));
 							
 				    	printk("old mac= %x:%x:%x:%x:%x:%x, dip=%x\n", 
@@ -4296,7 +4301,7 @@ void foe_clear_entry(struct neighbour *neigh)
 				    		entry->ipv4_hnapt.dmac_lo[0],
 				    		ntohl(dip));
 				    	printk("new mac= %x:%x:%x:%x:%x:%x, dip=%x\n", mac0, mac1, mac2, mac3, mac4, mac5, ntohl(dip));
-
+				*/
 				}
 			}
 		}
